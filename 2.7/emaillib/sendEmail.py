@@ -13,6 +13,27 @@ from sys import stdin
 import os
 
 __all__ = ['DispatchEmail', 'MessageWithAttachment']
+__version__ = 1.0
+API_NAME = 'Sendmail'
+
+ABOUT = """
+        This application you can use in three ways. First
+        way (send message via smtp server). U have to
+        indicate smtp server, yours email and receiver
+        email. It is required. For more options (body,
+        subject, etc.) check --help.
+        Second way (printing to standard output). To follow
+        this way u need to point key -e and both email:
+        yours and receiver. Also to create file with output,
+        just specify file with $ python send.py -e
+        > my_email.eml
+        Last way (sending message from
+        standard input). Very simple step. Just point
+        smtp server, it is required, other for yours wish.
+        Example : $ cat my_email.eml | py send.py /options/
+        :: If u will need some more options,
+        find them in --help. Good Luck !
+        """
 
 
 def create_iteration(*args):
@@ -21,45 +42,16 @@ def create_iteration(*args):
     for arg in args:
         if isinstance(arg, list):
             cache += arg
-        elif isinstance(arg, dict):
-            raise ValueError('dict not provided')
+        elif isinstance(arg, (tuple, dict, set)):
+            raise ValueError('Not provided this type %r' % (type(arg),))
         else:
             cache.append(arg)
     return cache
 
 
 def get_args_parser(send_eml=True):
-    """Function for parsing command line strings into dictionary.
-
-    :param send_eml: flag for is tty was in use.
-    :type send_eml: bool
-    :return: dictionary with parsed values
-    :rtype: dict
-    """
-    pars = ArgumentParser(
-        description="""
-        This application you can use in three ways. First
-        way (send message via smtp server). U have to
-        indicate smtp server, yours email and receiver
-        email. It is required. For more options (body,
-        subject, etc.) check --help.
-
-        Second way (printing to standard output). To follow
-        this way u need to point key -e and both email:
-        yours and receiver. Also to create file with output,
-        just specify file with $ python send.py -e
-        > my_email.eml
-
-        Last way (sending message from
-        standard input). Very simple step. Just point
-        smtp server, it is required, other for yours wish.
-        Example : $ cat my_email.eml | py send.py /options/
-
-        :: If u will need some more options,
-        find them in --help. Good Luck !
-        """
-    )
-
+    """Function for parsing command from bash."""
+    pars = ArgumentParser(description=ABOUT)
     if send_eml:
         pars.add_argument('--from', nargs=1, required=True,
                           help='yours email send', dest='sender')
@@ -75,7 +67,6 @@ def get_args_parser(send_eml=True):
                           default=[None])
         pars.add_argument('-s', '--smtp', required=True, nargs=1,
                           help='smtp server')
-
     pars.add_argument('-c', '--cc', nargs='+', help='copies will send TO',
                       default=[])
     pars.add_argument('--subject', nargs='?', help='subject of message',
@@ -97,7 +88,7 @@ def get_args_parser(send_eml=True):
                       help='on authentication', const=True)
     pars.add_argument('--charset', nargs='?', type=str,
                       help='charset of encoding eml file', default='us-ascii')
-
+    # pars.add_argument('-h', '--help', action='help', help=ABOUT)
     return pars.parse_args()
 
 
@@ -128,7 +119,12 @@ class DispatchEmail(object):
     from EML file.
     """
 
-    def __init__(self, sender, receivers, cc=None, smtp=None, port=25,
+    def __init__(self,
+                 sender,
+                 receivers,
+                 cc=None,
+                 smtp=None,
+                 port=25,
                  tls=False):
         """
         This constructor create configurations for server which
@@ -143,15 +139,12 @@ class DispatchEmail(object):
         self.server = None
         self.message = None
 
-    def auth(self, username, password=None):
+    def auth(self, username, password=''):
         """Login user to server. Takes username and password
          for authentication.
         """
-        if not username:
-            username = self.sender
-            assert username, AttributeError('Not set username')
-        if not password:
-            password = getpass('Password: ')
+        username = (self.sender, AttributeError('Not set username'))[username]
+        password = (getpass('Password: '), password)[password]
         self.server.login(username, password)
 
     def get_addressees(self, sender, receiver):
@@ -184,15 +177,10 @@ class DispatchEmail(object):
         for receiver in self.cc:
             message.set_addresses(self.sender, receiver, self.cc)
             message = message.add_attachments()
-            print message, '\n', '=' * 50
-            # self.send(self.sender, receiver, message)
+            self.send(self.sender, receiver, message)
 
-    def send(self, sender=None, receiver=None, message=None):
+    def send(self, sender, receiver, message):
         """Method for send email via smtp server."""
-        if not (sender or receiver):
-            sender, receiver = self.get_addressees(sender, receiver)
-        if message is None:
-            message = self.message
         if not message:
             raise AttributeError('EML string was not given')
         if self.server is None:
@@ -219,8 +207,13 @@ class MessageWithAttachment(object):
     """Class provide opportunity to create multipart or plain type of message,
      set it and add files"""
 
-    def __init__(self, subject='', body='', files=None, charset='us-ascii',
-                 multipart=False, create_mime=True):
+    def __init__(self,
+                 subject='',
+                 body='',
+                 files=None,
+                 charset='us-ascii',
+                 multipart=False,
+                 create_mime=True):
         """Creates a multipart or plain type message.
 
         By default, creates a text/plain message, with proper
@@ -251,7 +244,6 @@ class MessageWithAttachment(object):
     def add_files(self, outer):
         """Function heck type of file and add files for outer."""
         for filename in self.files:
-            # print 'Attach : ' + filename
             path = os.path.abspath(filename)
             if not os.path.isfile(path):
                 continue
@@ -292,7 +284,9 @@ class MessageWithAttachment(object):
         if kwargs.get('group'):
             people = [people]
         for preceiver in people:
-            self.set_addresses(sender=sender, receiver=preceiver)
+            self.set_addresses(sender=sender,
+                               receiver=preceiver,
+                               delete_cache=True)
             yield preceiver, self.add_attachments()
 
     def create_mime_message(self):
@@ -319,26 +313,23 @@ class MessageWithAttachment(object):
         if self.subject:
             assert isinstance(self.body, str)
             self.message['Subject'] = self.subject
-
         return self.message.as_string()
 
-    def set_addresses(self, sender, receiver, cc=None):
+    def set_addresses(self, sender, receiver, cc=None, delete_cache=False):
         """Function set addresses to message"""
         if not self.message:
             raise AttributeError(
                 "MIME type didn't match, run instance.create_mime_message()"
             )
-        del self.message['From']
-        del self.message['To']
-
+        if delete_cache:
+            del self.message['From']
+            del self.message['To']
         self.message['From'] = '<' + sender + '>'
-
         if isinstance(receiver, list):
             recs = ''.join(['<' + addr + '>, ' for addr in receiver])
         else:
             recs = '<' + receiver + '>'
         self.message['To'] = recs
-
         if cc is not None:
             ccaddrs = ['<' + copy + '>, ' for copy in cc if receiver != copy]
             self.message['CC'] = ''.join(ccaddrs)
