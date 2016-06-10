@@ -1,0 +1,6 @@
+Update after OP's edit:
+
+There was a bug in the OP's version of virtualenv, as described here. The problem was fixed by running:
+
+>>> virtualenv -p python3 envname
+>>> pip install --upgrade virtualenv
