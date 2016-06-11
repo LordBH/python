@@ -144,7 +144,7 @@ class DispatchEmail(object):
          for authentication.
         """
         username = (self.sender, AttributeError('Not set username'))[username]
-        password = (getpass('Password: '), password)[password]
+        password = (getpass('Password: '), password)[bool(password)]
         self.server.login(username, password)
 
     def get_addressees(self, sender, receiver):
@@ -273,7 +273,7 @@ class MessageWithAttachment(object):
                            filename=filename)
             outer.attach(msg)
 
-    def create_special_addressee(self, *args, **kwargs):
+    def create_special_addresses(self, *args, **kwargs):
         """Function, which create special
 
         if group is True, message will contain only with receivers. Otherwise,
@@ -401,12 +401,14 @@ if __name__ == '__main__':
             if SEND_WITH_CC:
                 email.send_email(eml)
             else:
-                letters = eml.create_special_addressee(email.sender,
+                letters = eml.create_special_addresses(email.sender,
                                                        email.receivers,
                                                        email.cc,
                                                        group=True)
                 for deliver, letter in letters:
-                    email.send(receiver=deliver, message=letter)
+                    email.send(sender=email.sender,
+                               receiver=deliver, 
+                               message=letter)
     else:
         """Send email, taking message from standard input."""
         msg = stdin.read()
