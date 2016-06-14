@@ -351,22 +351,22 @@ class MessageWithAttachment(object):
 
 if __name__ == '__main__':
     # Sender, receiver and copies
-    FROM = 'msereden@softserveinc.com'
-    TO = 'msereden@softserveinc.com'
+    FROM = ''
+    TO = ''
     CC = []
 
     # Connection settings
-    SMTP_SERVER = 'smtp.softserveinc.com'
+    SMTP_SERVER = ''
     PORT = 25
     TLS = True
     USERNAME = None
     PASSWORD = ''
-    EML_CREATE = True
+    EML_CREATE = False
     AUTH = True
 
     # Message view
-    SUBJECT = 'Message to u'
-    BODY = 'Hello there !'
+    SUBJECT = ''
+    BODY = ''
     FILES = []
     CHARSET = 'utf-8'
 
