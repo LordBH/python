@@ -13,9 +13,6 @@ from sys import stdin
 import os
 
 __all__ = ['DispatchEmail', 'MessageWithAttachment']
-__version__ = 1.0
-API_NAME = 'Sendmail'
-
 ABOUT = """
         This application you can use in three ways. First
         way (send message via smtp server). U have to
@@ -143,8 +140,12 @@ class DispatchEmail(object):
         """Login user to server. Takes username and password
          for authentication.
         """
-        username = (self.sender, AttributeError('Not set username'))[username]
-        password = (getpass('Password: '), password)[password]
+        if username is None:
+            username = self.sender
+        elif not username:
+            raise AttributeError('Not set username')
+        if not password:
+            password = getpass('Password: ')
         self.server.login(username, password)
 
     def get_addressees(self, sender, receiver):
@@ -191,16 +192,16 @@ class DispatchEmail(object):
         """
         Set sender and receiver to instance of DispatchEmail from EML file.
         """
-        eml = message_from_string(mbox)
+        mperser = message_from_string(mbox)
         for header in ['from', 'to']:
             # Getting value/addresses from MIME header
-            header_value = eml.get_all(header, [])
+            header_value = mperser.get_all(header, [])
             addresses = getaddresses(header_value)
-            for real_name, email in addresses:
+            for real_name, em in addresses:
                 if header == 'from':
-                    self.sender = email
+                    self.sender = em
                 if header == 'to':
-                    self.receivers = email
+                    self.receivers = em
 
 
 class MessageWithAttachment(object):
@@ -253,25 +254,25 @@ class MessageWithAttachment(object):
             maintype, subtype = ctype.split('/', 1)
             if maintype == 'text':
                 fp = open(path)
-                msg = MIMEText(fp.read(), _subtype=subtype)
+                mmsg = MIMEText(fp.read(), _subtype=subtype)
                 fp.close()
             elif maintype == 'image':
                 fp = open(path, 'rb')
-                msg = MIMEImage(fp.read(), _subtype=subtype)
+                mmsg = MIMEImage(fp.read(), _subtype=subtype)
                 fp.close()
             elif maintype == 'audio':
                 fp = open(path, 'rb')
-                msg = MIMEAudio(fp.read(), _subtype=subtype)
+                mmsg = MIMEAudio(fp.read(), _subtype=subtype)
                 fp.close()
             else:
                 fp = open(path, 'rb')
-                msg = MIMEBase(maintype, subtype)
-                msg.set_payload(fp.read())
+                mmsg = MIMEBase(maintype, subtype)
+                mmsg.set_payload(fp.read())
                 fp.close()
-                encoders.encode_base64(msg)
-            msg.add_header('Content-Disposition', 'attachment',
-                           filename=filename)
-            outer.attach(msg)
+                encoders.encode_base64(mmsg)
+            mmsg.add_header('Content-Disposition', 'attachment',
+                            filename=filename)
+            outer.attach(mmsg)
 
     def create_special_addressee(self, *args, **kwargs):
         """Function, which create special
@@ -349,22 +350,22 @@ class MessageWithAttachment(object):
 
 if __name__ == '__main__':
     # Sender, receiver and copies
-    FROM = ''
-    TO = []
+    FROM = 'msereden@softserveinc.com'
+    TO = 'msereden@softserveinc.com'
     CC = []
 
     # Connection settings
-    SMTP_SERVER = ''
+    SMTP_SERVER = 'smtp.softserveinc.com'
     PORT = 25
     TLS = True
     USERNAME = None
     PASSWORD = ''
-    EML_CREATE = False
+    EML_CREATE = True
     AUTH = True
 
     # Message view
-    SUBJECT = ''
-    BODY = ''
+    SUBJECT = 'Message to u'
+    BODY = 'Hello there !'
     FILES = []
     CHARSET = 'utf-8'
 
@@ -406,7 +407,9 @@ if __name__ == '__main__':
                                                        email.cc,
                                                        group=True)
                 for deliver, letter in letters:
-                    email.send(receiver=deliver, message=letter)
+                    email.send(sender=email.sender,
+                               receiver=deliver,
+                               message=letter)
     else:
         """Send email, taking message from standard input."""
         msg = stdin.read()
@@ -414,4 +417,4 @@ if __name__ == '__main__':
         email.set_sender_and_receiver(msg)
         if AUTH:
             email.auth(USERNAME)
-        email.server.sendmail(email.sender, email.receivers, msg)
+        email.send(email.sender, email.receivers, msg)
